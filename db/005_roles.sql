@@ -1,0 +1,26 @@
+CREATE TABLE core.meeting_summaries (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  meeting_id uuid NOT NULL REFERENCES core.meetings(id),
+  summary_text text NOT NULL,
+  source_type core.source_type NOT NULL DEFAULT 'ai_generated',
+  approval_status core.approval_status
+    NOT NULL DEFAULT 'proposed',
+  approved_by uuid REFERENCES core.users(id),
+  approved_at timestamptz,
+  CHECK (approval_status <> 'approved'
+    OR (approved_by IS NOT NULL AND approved_at IS NOT NULL))
+);
+O $$ BEGIN
+ IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'team_a_app') THEN
+ CREATE ROLE team_a_app LOGIN PASSWORD 'team_a_secure_pass';
+ END IF;
+ IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'team_b_app') THEN
+ CREATE ROLE team_b_app LOGIN PASSWORD 'team_b_secure_pass';
+ END IF;
+END $$;
+GRANT USAGE ON SCHEMA core, product_a TO team_a_app;
+GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA core TO team_a_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA product_a TO team_a_app;
+GRANT USAGE ON SCHEMA core, product_b TO team_b_app;
+GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA core TO team_b_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA product_b TO team_b_app;
