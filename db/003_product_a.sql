@@ -1,6 +1,8 @@
 -- Product A Tables (Team A - Marketing & Brand Management Platform)
 -- Multi-tenant SaaS architecture with workspace isolation
 
+CREATE SCHEMA IF NOT EXISTS product_a;
+
 -- ============================================================================
 -- BRAND MANAGEMENT
 -- ============================================================================
@@ -15,7 +17,7 @@ CREATE TABLE product_a.brand_profiles (
   website_url text,
   industry text,
   target_audience text,
-  brand_status text NOT NULL DEFAULT 'active' 
+  brand_status text NOT NULL DEFAULT 'active'
     CHECK (brand_status IN ('active', 'inactive', 'archived')),
   created_by uuid REFERENCES core.users(id),
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -26,30 +28,31 @@ CREATE TABLE product_a.brand_profiles (
 -- Brand Colors - Color palettes for each brand
 CREATE TABLE product_a.brand_colors (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
   brand_id uuid NOT NULL REFERENCES product_a.brand_profiles(id) ON DELETE CASCADE,
   color_name text NOT NULL,
-  hex_value text NOT NULL,
+  hex_value text NOT NULL
+    CHECK (hex_value ~ '^#[0-9A-Fa-f]{6}$'),
   color_type text NOT NULL DEFAULT 'primary'
     CHECK (color_type IN ('primary', 'secondary', 'accent', 'background', 'text')),
   usage_notes text,
   created_at timestamptz NOT NULL DEFAULT now()
-  workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
 );
 
 -- Brand Assets - Logo, images, fonts, and other brand assets
 CREATE TABLE product_a.brand_assets (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
   brand_id uuid NOT NULL REFERENCES product_a.brand_profiles(id) ON DELETE CASCADE,
   asset_name text NOT NULL,
-  asset_type text NOT NULL 
+  asset_type text NOT NULL
     CHECK (asset_type IN ('logo', 'image', 'font', 'document', 'video', 'other')),
   file_url text NOT NULL,
   file_size_bytes bigint,
   mime_type text,
   description text,
   uploaded_by uuid REFERENCES core.users(id),
-  created_at timestamptz NOT NULL DEFAULT now(),
-  workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now()
 );
 
 -- ============================================================================
@@ -79,20 +82,20 @@ CREATE TABLE product_a.campaigns (
   created_by uuid REFERENCES core.users(id),
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT check_campaign_dates CHECK (end_date IS NULL OR start_date IS NULL OR end_date >= start_date)
 );
 
 -- Campaign Channels - Platforms/channels used in campaigns
 CREATE TABLE product_a.campaign_channels (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
   campaign_id uuid NOT NULL REFERENCES product_a.campaigns(id) ON DELETE CASCADE,
   channel_name text NOT NULL
-    CHECK (channel_name IN ('facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'youtube', 
+    CHECK (channel_name IN ('facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'youtube',
                             'google_ads', 'email', 'website', 'blog', 'other')),
   budget_allocation numeric(12,2) DEFAULT 0.00,
   performance_metrics jsonb,
   is_active boolean DEFAULT true,
-  workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
@@ -130,6 +133,7 @@ CREATE TABLE product_a.content_calendar (
 -- Content Pieces - Actual content items
 CREATE TABLE product_a.content_pieces (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
   content_calendar_id uuid NOT NULL REFERENCES product_a.content_calendar(id) ON DELETE CASCADE,
   content_body text,
   media_urls text[],
@@ -137,9 +141,7 @@ CREATE TABLE product_a.content_pieces (
   target_channels text[],
   performance_metrics jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
-  workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
 
 -- ============================================================================
@@ -166,12 +168,16 @@ CREATE TABLE product_a.marketing_requests (
   created_by uuid REFERENCES core.users(id),
   assigned_to uuid REFERENCES core.users(id),
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT check_budget_range CHECK (
+    budget_range_min IS NULL OR budget_range_max IS NULL OR budget_range_min <= budget_range_max
+  )
 );
 
 -- Request Responses - Vendor/agency responses to requests
 CREATE TABLE product_a.request_responses (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
   request_id uuid NOT NULL REFERENCES product_a.marketing_requests(id) ON DELETE CASCADE,
   vendor_name text NOT NULL,
   vendor_contact_email text NOT NULL,
@@ -185,7 +191,6 @@ CREATE TABLE product_a.request_responses (
   review_notes text,
   submitted_at timestamptz NOT NULL DEFAULT now(),
   reviewed_by uuid REFERENCES core.users(id),
-  workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
   reviewed_at timestamptz
 );
 
@@ -196,6 +201,7 @@ CREATE TABLE product_a.request_responses (
 -- Campaign Analytics - Performance tracking
 CREATE TABLE product_a.campaign_analytics (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
   campaign_id uuid NOT NULL REFERENCES product_a.campaigns(id) ON DELETE CASCADE,
   metric_date date NOT NULL,
   impressions bigint DEFAULT 0,
@@ -207,13 +213,13 @@ CREATE TABLE product_a.campaign_analytics (
   roi_percentage numeric(10,2),
   additional_metrics jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
-  workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
   CONSTRAINT unique_campaign_date_analytics UNIQUE (campaign_id, metric_date)
 );
 
 -- Brand Performance Metrics
 CREATE TABLE product_a.brand_metrics (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
   brand_id uuid NOT NULL REFERENCES product_a.brand_profiles(id) ON DELETE CASCADE,
   metric_date date NOT NULL,
   brand_awareness_score numeric(5,2),
@@ -223,7 +229,6 @@ CREATE TABLE product_a.brand_metrics (
   engagement_score numeric(5,2),
   additional_metrics jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
-  workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
   CONSTRAINT unique_brand_date_metrics UNIQUE (brand_id, metric_date)
 );
 
@@ -255,26 +260,47 @@ CREATE TABLE product_a.review_comments (
 CREATE INDEX idx_brand_profiles_workspace ON product_a.brand_profiles(workspace_id);
 CREATE INDEX idx_brand_profiles_status ON product_a.brand_profiles(brand_status);
 
+-- Brand Colors / Assets
+CREATE INDEX idx_brand_colors_brand ON product_a.brand_colors(brand_id);
+CREATE INDEX idx_brand_colors_workspace ON product_a.brand_colors(workspace_id);
+CREATE INDEX idx_brand_assets_brand ON product_a.brand_assets(brand_id);
+CREATE INDEX idx_brand_assets_workspace ON product_a.brand_assets(workspace_id);
+
 -- Campaigns
 CREATE INDEX idx_campaigns_workspace ON product_a.campaigns(workspace_id);
 CREATE INDEX idx_campaigns_brand ON product_a.campaigns(brand_id);
 CREATE INDEX idx_campaigns_status ON product_a.campaigns(status);
 CREATE INDEX idx_campaigns_dates ON product_a.campaigns(start_date, end_date);
 
+-- Campaign Channels
+CREATE INDEX idx_campaign_channels_campaign ON product_a.campaign_channels(campaign_id);
+CREATE INDEX idx_campaign_channels_workspace ON product_a.campaign_channels(workspace_id);
+
 -- Content Calendar
 CREATE INDEX idx_content_calendar_workspace ON product_a.content_calendar(workspace_id);
 CREATE INDEX idx_content_calendar_campaign ON product_a.content_calendar(campaign_id);
+CREATE INDEX idx_content_calendar_brand ON product_a.content_calendar(brand_id);
 CREATE INDEX idx_content_calendar_scheduled ON product_a.content_calendar(scheduled_date);
 CREATE INDEX idx_content_calendar_status ON product_a.content_calendar(status);
+
+-- Content Pieces
+CREATE INDEX idx_content_pieces_calendar ON product_a.content_pieces(content_calendar_id);
+CREATE INDEX idx_content_pieces_workspace ON product_a.content_pieces(workspace_id);
 
 -- Marketing Requests
 CREATE INDEX idx_marketing_requests_workspace ON product_a.marketing_requests(workspace_id);
 CREATE INDEX idx_marketing_requests_brand ON product_a.marketing_requests(brand_id);
 CREATE INDEX idx_marketing_requests_status ON product_a.marketing_requests(status);
 
+-- Request Responses
+CREATE INDEX idx_request_responses_request ON product_a.request_responses(request_id);
+CREATE INDEX idx_request_responses_workspace ON product_a.request_responses(workspace_id);
+
 -- Analytics
 CREATE INDEX idx_campaign_analytics_campaign ON product_a.campaign_analytics(campaign_id);
+CREATE INDEX idx_campaign_analytics_workspace ON product_a.campaign_analytics(workspace_id);
 CREATE INDEX idx_campaign_analytics_date ON product_a.campaign_analytics(metric_date);
+CREATE INDEX idx_brand_metrics_workspace ON product_a.brand_metrics(workspace_id);
 
 -- Review Comments
 CREATE INDEX idx_review_comments_workspace ON product_a.review_comments(workspace_id);
@@ -307,6 +333,7 @@ LEFT JOIN product_a.campaign_analytics ca ON ca.campaign_id = c.id
 GROUP BY c.id, c.campaign_name, c.workspace_id, c.brand_id, b.brand_name, c.status, c.budget;
 
 -- Content Pipeline Overview
+-- overdue_count excludes items that are already published or cancelled
 CREATE VIEW product_a.content_pipeline_overview AS
 SELECT
   cc.workspace_id,
@@ -315,29 +342,52 @@ SELECT
   cc.status,
   cc.content_type,
   COUNT(*) AS content_count,
-  COUNT(CASE WHEN cc.scheduled_date < now() THEN 1 END) AS overdue_count,
-  COUNT(CASE WHEN cc.source_type = 'ai_generated' AND cc.approval_status = 'proposed' THEN 1 END) AS pending_approval_count
+  COUNT(CASE
+          WHEN cc.scheduled_date < now()
+           AND cc.status NOT IN ('published', 'cancelled')
+          THEN 1
+        END) AS overdue_count,
+  COUNT(CASE
+          WHEN cc.source_type = 'ai_generated'
+           AND cc.approval_status = 'proposed'
+          THEN 1
+        END) AS pending_approval_count
 FROM product_a.content_calendar cc
 LEFT JOIN product_a.brand_profiles b ON b.id = cc.brand_id
 GROUP BY cc.workspace_id, cc.brand_id, b.brand_name, cc.status, cc.content_type;
 
 -- Brand Activity Summary
+-- Each child table is aggregated separately first to avoid row multiplication
 CREATE VIEW product_a.brand_activity_summary AS
 SELECT
   bp.id AS brand_id,
   bp.brand_name,
   bp.workspace_id,
   bp.brand_status,
-  COUNT(DISTINCT c.id) AS total_campaigns,
-  COUNT(DISTINCT CASE WHEN c.status = 'active' THEN c.id END) AS active_campaigns,
-  COUNT(DISTINCT cc.id) AS total_content_items,
-  COUNT(DISTINCT mr.id) AS total_marketing_requests,
+  COALESCE(c.total_campaigns, 0) AS total_campaigns,
+  COALESCE(c.active_campaigns, 0) AS active_campaigns,
+  COALESCE(cc.total_content_items, 0) AS total_content_items,
+  COALESCE(mr.total_marketing_requests, 0) AS total_marketing_requests,
   bp.created_at
 FROM product_a.brand_profiles bp
-LEFT JOIN product_a.campaigns c ON c.brand_id = bp.id
-LEFT JOIN product_a.content_calendar cc ON cc.brand_id = bp.id
-LEFT JOIN product_a.marketing_requests mr ON mr.brand_id = bp.id
-GROUP BY bp.id, bp.brand_name, bp.workspace_id, bp.brand_status, bp.created_at;
+LEFT JOIN (
+  SELECT
+    brand_id,
+    COUNT(*) AS total_campaigns,
+    COUNT(*) FILTER (WHERE status = 'active') AS active_campaigns
+  FROM product_a.campaigns
+  GROUP BY brand_id
+) c ON c.brand_id = bp.id
+LEFT JOIN (
+  SELECT brand_id, COUNT(*) AS total_content_items
+  FROM product_a.content_calendar
+  GROUP BY brand_id
+) cc ON cc.brand_id = bp.id
+LEFT JOIN (
+  SELECT brand_id, COUNT(*) AS total_marketing_requests
+  FROM product_a.marketing_requests
+  GROUP BY brand_id
+) mr ON mr.brand_id = bp.id;
 
 -- ============================================================================
 -- TRIGGERS FOR UPDATED_AT TIMESTAMPS
