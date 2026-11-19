@@ -3,11 +3,13 @@
 -- All external tables are expected to exist in the "core" schema
 -- ============================================================
 
+CREATE SCHEMA IF NOT EXISTS product_b;
+
 SET search_path TO product_b, core, public;
 
 -- 1. Agencies
 CREATE TABLE agencies (
-    agency_id           SERIAL PRIMARY KEY,
+    agency_id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     workspace_id        UUID NOT NULL REFERENCES core.workspaces(id),
     name                VARCHAR(150) NOT NULL,
     description         TEXT,
@@ -23,12 +25,12 @@ CREATE TABLE agencies (
 
 -- 2. Agency Members
 CREATE TABLE agency_members (
-    agency_member_id    SERIAL PRIMARY KEY,
-    agency_id           INTEGER NOT NULL REFERENCES agencies(agency_id) ON DELETE CASCADE,
+    agency_member_id    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    agency_id           UUID NOT NULL REFERENCES agencies(agency_id) ON DELETE CASCADE,
     user_id             UUID NOT NULL REFERENCES core.users(id),
+    workspace_id        UUID NOT NULL REFERENCES core.workspaces(id),
     member_status       VARCHAR(30) DEFAULT 'active',
     joined_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    workspace_id UUID NOT NULL REFERENCES core.workspaces(id),
     UNIQUE (agency_id, user_id)
 );
 
@@ -95,13 +97,13 @@ CREATE TABLE request_services (
 CREATE TABLE agency_invitations (
     invitation_id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     request_id          UUID NOT NULL REFERENCES marketing_requests(request_id) ON DELETE CASCADE,
-    agency_id           INTEGER NOT NULL REFERENCES agencies(agency_id),
+    agency_id           UUID NOT NULL REFERENCES agencies(agency_id),
     created_by_user_id  UUID NOT NULL REFERENCES core.users(id),
     invited_to_user_id  UUID REFERENCES core.users(id),
+    workspace_id        UUID NOT NULL REFERENCES core.workspaces(id),
     status              VARCHAR(30) DEFAULT 'pending',
     invited_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     viewed_at           TIMESTAMPTZ,
-    workspace_id UUID NOT NULL REFERENCES core.workspaces(id),
     response_deadline   TIMESTAMPTZ
 );
 
@@ -134,11 +136,11 @@ CREATE TABLE proposal_items (
     proposal_item_id    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     proposal_id         UUID NOT NULL REFERENCES proposals(proposal_id) ON DELETE CASCADE,
     service_id          UUID REFERENCES services(service_id),
+    workspace_id        UUID NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
     item_name           VARCHAR(150) NOT NULL,
     description         TEXT,
     quantity            INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
     unit_price          DECIMAL(12,2) NOT NULL,
-    workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
     line_total          DECIMAL(14,2) GENERATED ALWAYS AS (quantity * unit_price) STORED
 );
 
@@ -147,17 +149,17 @@ CREATE TABLE project_sources (
     project_source_id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id          UUID NOT NULL REFERENCES core.projects(id),
     proposal_id         UUID NOT NULL REFERENCES proposals(proposal_id),
-    workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
+    workspace_id        UUID NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
     UNIQUE (project_id, proposal_id)
 );
 
 -- 12. Project Members
 CREATE TABLE project_members (
-    project_member_id   SERIAL PRIMARY KEY,
+    project_member_id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id          UUID NOT NULL REFERENCES core.projects(id),
     workspace_member_id UUID NOT NULL REFERENCES core.workspace_members(id),
-    role_id UUID REFERENCES core.roles(id),
-    workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
+    role_id             UUID REFERENCES core.roles(id),
+    workspace_id        UUID NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
     assigned_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -166,10 +168,10 @@ CREATE TABLE project_updates (
     update_id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id          UUID NOT NULL REFERENCES core.projects(id),
     author_user_id      UUID NOT NULL REFERENCES core.users(id),
+    workspace_id        UUID NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
     title               VARCHAR(200),
     update_text         TEXT NOT NULL,
     client_visible      BOOLEAN NOT NULL DEFAULT FALSE,
-    workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -193,8 +195,8 @@ CREATE TABLE document_links (
     document_link_id    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     document_id         UUID NOT NULL REFERENCES documents(document_id) ON DELETE CASCADE,
     request_id          UUID REFERENCES marketing_requests(request_id),
-    workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
-    proposal_id         UUID REFERENCES proposals(proposal_id)
+    proposal_id         UUID REFERENCES proposals(proposal_id),
+    workspace_id        UUID NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE
 );
 
 -- 16. Tickets
@@ -216,8 +218,8 @@ CREATE TABLE ticket_messages (
     message_id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     ticket_id           UUID NOT NULL REFERENCES tickets(ticket_id) ON DELETE CASCADE,
     sender_user_id      UUID NOT NULL REFERENCES core.users(id),
+    workspace_id        UUID NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
     message_text        TEXT NOT NULL,
-    workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -226,12 +228,12 @@ CREATE TABLE quotes (
     quote_id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id          UUID NOT NULL REFERENCES core.projects(id),
     document_id         UUID REFERENCES documents(document_id),
+    workspace_id        UUID NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
     amount              DECIMAL(14,2) NOT NULL,
     currency            VARCHAR(10) DEFAULT 'USD',
     status              VARCHAR(30) DEFAULT 'draft',
     valid_until         DATE,
     created_by          UUID NOT NULL REFERENCES core.users(id),
-    workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -241,13 +243,13 @@ CREATE TABLE invoices (
     project_id          UUID NOT NULL REFERENCES core.projects(id),
     quote_id            UUID REFERENCES quotes(quote_id),
     document_id         UUID REFERENCES documents(document_id),
+    workspace_id        UUID NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
     amount              DECIMAL(14,2) NOT NULL,
     currency            VARCHAR(10) DEFAULT 'USD',
     status              VARCHAR(30) DEFAULT 'draft',
     due_date            DATE,
     issued_at           TIMESTAMPTZ,
     created_by          UUID NOT NULL REFERENCES core.users(id),
-    workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -255,10 +257,10 @@ CREATE TABLE invoices (
 CREATE TABLE agency_reviews (
     agency_review_id    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id          UUID NOT NULL REFERENCES core.projects(id),
+    workspace_id        UUID NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
     rating              SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
     comment             TEXT,
     visibility          VARCHAR(30) DEFAULT 'public',
-    workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -267,6 +269,7 @@ CREATE TABLE campaigns (
     campaign_id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id          UUID NOT NULL REFERENCES core.projects(id),
     client_id           UUID REFERENCES client_companies(client_company_id),
+    workspace_id        UUID NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
     name                VARCHAR(200) NOT NULL,
     objective           TEXT,
     platform            VARCHAR(100),
@@ -276,14 +279,14 @@ CREATE TABLE campaigns (
     currency            VARCHAR(10) DEFAULT 'USD',
     status              VARCHAR(30) DEFAULT 'draft',
     created_by          UUID NOT NULL REFERENCES core.users(id),
-    workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- 22. Campaign Metrics
 CREATE TABLE campaign_metrics (
-    metric_id           SERIAL PRIMARY KEY,
+    metric_id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     campaign_id         UUID NOT NULL REFERENCES campaigns(campaign_id) ON DELETE CASCADE,
+    workspace_id        UUID NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
     metric_date         DATE NOT NULL,
     reach               BIGINT DEFAULT 0,
     impressions         BIGINT DEFAULT 0,
@@ -294,7 +297,6 @@ CREATE TABLE campaign_metrics (
     revenue             DECIMAL(14,2) DEFAULT 0,
     source              VARCHAR(100),
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
     UNIQUE (campaign_id, metric_date, source)
 );
 
@@ -302,13 +304,13 @@ CREATE TABLE campaign_metrics (
 CREATE TABLE competitors (
     competitor_id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id          UUID REFERENCES client_companies(client_company_id),
+    workspace_id        UUID NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
     name                VARCHAR(150) NOT NULL,
     industry            VARCHAR(100),
     website_url         VARCHAR(255),
     social_profiles     TEXT,
     notes               TEXT,
     created_by          UUID NOT NULL REFERENCES core.users(id),
-    workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -317,13 +319,13 @@ CREATE TABLE competitor_analyses (
     analysis_id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     competitor_id       UUID NOT NULL REFERENCES competitors(competitor_id) ON DELETE CASCADE,
     project_id          UUID REFERENCES core.projects(id),
+    workspace_id        UUID NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
     analysis_date       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     analysis_type       VARCHAR(100),
     source_url          VARCHAR(500),
     findings            TEXT,
     ai_summary          TEXT,
     created_by          UUID NOT NULL REFERENCES core.users(id),
-    workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -331,6 +333,7 @@ CREATE TABLE competitor_analyses (
 CREATE TABLE trend_analyses (
     trend_id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id          UUID REFERENCES core.projects(id),
+    workspace_id        UUID NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
     trend_name          VARCHAR(200) NOT NULL,
     category            VARCHAR(100),
     source_name         VARCHAR(150),
@@ -340,7 +343,6 @@ CREATE TABLE trend_analyses (
     ai_summary          TEXT,
     relevance_score     DECIMAL(5,2),
     created_by          UUID NOT NULL REFERENCES core.users(id),
-    workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -349,6 +351,7 @@ CREATE TABLE ai_suggestions (
     suggestion_id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id          UUID REFERENCES core.projects(id),
     campaign_id         UUID REFERENCES campaigns(campaign_id),
+    workspace_id        UUID NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
     type                VARCHAR(50),
     title               VARCHAR(200),
     content             TEXT,
@@ -358,7 +361,6 @@ CREATE TABLE ai_suggestions (
     status              VARCHAR(30) DEFAULT 'pending',
     reviewed_by         UUID REFERENCES core.users(id),
     reviewed_at         TIMESTAMPTZ,
-    workspace_id uuid NOT NULL REFERENCES core.workspaces(id) ON DELETE CASCADE,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

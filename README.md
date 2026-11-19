@@ -1,349 +1,477 @@
-# Multi-Tenant SaaS Platform - Database Schema
+# Multi-Tenant SaaS Platform
 
-A PostgreSQL-based multi-tenant SaaS platform with support for multiple products (Product A & Product B), AI-generated content with approval workflows, and comprehensive role-based access control.
+A full-stack PostgreSQL-based multi-tenant SaaS platform with Node.js/Express backend, supporting multiple products (Aliigner & CreatiX), AI-generated content with approval workflows, and comprehensive role-based access control.
 
-## 🏗️ Architecture Overview
+## 🏗️ Project Structure
 
-### Multi-Tenancy Model
-- **Workspace-based isolation**: Each workspace is a tenant
-- **Shared schema approach**: All tenants share the same tables with workspace_id filtering
-- **Product-specific schemas**: Separate schemas for Product A and Product B features
-
-### Schema Structure
 ```
-├── core (shared across all products)
-│   ├── workspaces
-│   ├── users
-│   ├── roles
-│   ├── workspace_members
-│   ├── clients
-│   ├── projects
-│   ├── phases
-│   ├── tasks
-│   ├── meetings
-│   └── meeting_summaries
-├── product_a (Product A specific)
-│   ├── brand_profiles
-│   └── marketing_requests
-└── product_b (Product B specific)
-    └── campaigns
+Core_Project_Final/
+├── Core/
+│   └── Back-End/               # Node.js/Express API Backend
+│       ├── src/
+│       │   ├── config/         # Database & environment configuration
+│       │   ├── middleware/     # Auth, RBAC, tenant isolation, validation
+│       │   ├── routes/         # API route definitions
+│       │   ├── controllers/    # Request handlers
+│       │   ├── services/       # Business logic layer
+│       │   ├── server.js       # Entry point
+│       │   └── app.js          # Express app configuration
+│       ├── test/               # Jest test suites
+│       ├── package.json        # Dependencies
+│       ├── .env.example        # Environment template
+│       └── Dockerfile          # Container definition
+│
+├── db/                         # PostgreSQL Schema & Migrations
+│   ├── 001_schemas_types.sql   # Schemas & custom types
+│   ├── 002_core.sql            # Core tables (workspaces, users, projects)
+│   ├── 003_Aliigner.sql        # Product A: Brand & Marketing Management
+│   ├── 004_CreatiX.sql         # Product B: Campaign & Market Insights
+│   ├── 005_roles.sql           # Application roles & permissions
+│   ├── 006_seed.sql            # Seed data
+│   └── 007_core_rls.sql        # Row-level security policies
+│
+├── Aliigner/                   # Product A Frontend (TBD)
+├── CreatiX/                    # Product B Frontend (TBD)
+├── docker-compose.yml          # Multi-service orchestration
+├── .env                        # Environment configuration
+└── README.md                   # This file
 ```
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Docker & Docker Compose
-- PostgreSQL client (optional, for manual connections)
+- **Node.js** 22.x or higher
+- **Docker & Docker Compose**
+- **PostgreSQL Client** (optional, for manual connections)
+- **npm** 10.x or higher
 
-### Setup Instructions
+### 1. Clone & Navigate
+```bash
+cd C:\Users\Ablaven\Desktop\WebSties\Core_Project_Final
+```
 
-1. **Clone/Navigate to project directory**
-   ```bash
-   cd Core_Project_Final
-   ```
+### 2. Environment Setup
+```bash
+# Copy and configure environment variables
+cp .env.example .env
+# Edit .env with your configuration
+```
 
-2. **Configure environment variables**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your configuration
-   ```
+### 3. Database Setup
+```bash
+# Start PostgreSQL database
+docker-compose up -d db
 
-3. **Start the database**
-   ```bash
-   # Start database only
-   docker-compose up -d db
-   
-   # Start with pgAdmin (optional)
-   docker-compose --profile admin up -d
-   ```
+# Verify database is running
+docker-compose ps
+docker-compose logs db
 
-4. **Verify database is running**
-   ```bash
-   docker-compose ps
-   docker-compose logs db
-   ```
+# Wait for initialization (check health status)
+docker-compose exec db pg_isready -U saas_admin -d saas_platform
+```
 
-5. **Connect to database**
-   ```bash
-   docker exec -it saas_postgres psql -U saas_admin -d saas_platform
-   ```
+### 4. Backend Setup
+```bash
+# Navigate to backend directory
+cd Core/Back-End
 
-### Database Initialization
+# Install dependencies
+npm install
 
-The database is automatically initialized with all schemas, tables, and seed data when the container starts. The SQL files are executed in order:
+# Copy environment configuration
+cp .env.example .env
 
-1. `001_schemas_types.sql` - Creates schemas and custom types
-2. `002_core.sql` - Creates core tables
-3. `003_product_a.sql` - Creates Product A tables
-4. `004_product_b.sql` - Creates Product B tables
-5. `005_roles.sql` - Creates application roles and permissions
-6. `006_seed.sql` - Inserts seed data
+# Configure your .env file with:
+# - DATABASE_URL=postgresql://saas_admin:your_password@localhost:5432/saas_platform
+# - JWT_SECRET=your_secure_secret
+# - PORT=3000
+
+# Start development server
+npm run dev
+```
+
+### 5. Verify Installation
+```bash
+# Backend should be running on http://localhost:3000
+# Database accessible on localhost:5432
+```
+
+## 🏛️ Architecture Overview
+
+### Multi-Tenancy Model
+- **Workspace-based isolation**: Each workspace is a tenant
+- **Shared schema approach**: All tenants share tables with `workspace_id` filtering
+- **Product-specific schemas**: Separate schemas for Aliigner and CreatiX
+
+### Technology Stack
+
+#### Backend
+- **Runtime**: Node.js 22.x
+- **Framework**: Express 4.x
+- **Database Client**: node-postgres (pg)
+- **Authentication**: JWT with bcrypt password hashing
+- **Validation**: Joi schema validation
+- **Security**: Helmet, CORS, express-rate-limit
+- **Testing**: Jest + Supertest
+- **Development**: Nodemon for hot-reload
+
+#### Database
+- **PostgreSQL 16+** with UUID v4 primary keys
+- **Multi-schema design**: `core`, `product_a`, `product_b`
+- **Custom types**: `source_type`, `approval_status`
+- **Row-Level Security (RLS)** for tenant isolation
+
+### API Architecture
+```
+Request → Routes → Controllers → Services → Database
+            ↓
+       Middleware Chain:
+       - Error Handler
+       - Auth (JWT verification)
+       - Tenant Isolation
+       - Role-Based Access Control (RBAC)
+       - Input Validation
+```
 
 ## 📊 Database Schema
 
-### Core Tables
+### Core Schema (`core`)
 
-#### workspaces
-Multi-tenant workspaces (one per customer/organization)
-```sql
-- id: uuid (PK)
-- name: text
-- product_code: text (PROD_A | PROD_B)
-- created_at: timestamptz
-```
+**workspaces** - Multi-tenant workspaces
+- `id` (uuid PK), `name`, `product_code`, `created_at`
 
-#### users
-Platform users across all workspaces
-```sql
-- id: uuid (PK)
-- email: text (unique)
-- password_hash: text
-- first_name: text
-- last_name: text
-- avatar_url: text
-- account_status: text (active | suspended | pending)
-- created_at: timestamptz
-```
+**users** - Platform users
+- `id` (uuid PK), `email` (unique), `password_hash`, `first_name`, `last_name`, `account_status`
 
-#### roles
-System-wide roles
-```sql
-- id: uuid (PK)
-- role_name: text (unique) - Admin, Manager, Member, Viewer
-```
+**roles** - System roles
+- `id` (uuid PK), `role_name` (Admin | Manager | Member | Viewer)
 
-#### workspace_members
-User membership in workspaces
-```sql
-- id: uuid (PK)
-- workspace_id: uuid (FK → workspaces)
-- user_id: uuid (FK → users)
-- role_id: uuid (FK → roles)
-- joined_at: timestamptz
-```
+**workspace_members** - User ↔ Workspace ↔ Role mapping
+- `workspace_id`, `user_id`, `role_id`
 
-#### projects
-Client projects within workspaces
-```sql
-- id: uuid (PK)
-- workspace_id: uuid (FK → workspaces)
-- client_id: uuid (FK → clients)
-- manager_id: uuid (FK → users)
-- name: text
-- status: text (planned | active | on_hold | completed | cancelled)
-- created_at: timestamptz
-```
+**projects** - Client projects
+- `id`, `workspace_id`, `client_id`, `manager_id`, `name`, `status`
 
-#### tasks
-Project tasks with AI approval workflow
-```sql
-- id: uuid (PK)
-- workspace_id: uuid (FK → workspaces)
-- phase_id: uuid (FK → phases)
-- assigned_to: uuid (FK → users)
-- title: text
-- status: text (todo | in_progress | review | done)
-- source_type: enum (manual | ai_generated)
-- approval_status: enum (proposed | approved | rejected)
-- approved_by: uuid (FK → users)
-- approved_at: timestamptz
-```
+**tasks** - Project tasks with AI approval
+- `id`, `workspace_id`, `phase_id`, `assigned_to`, `source_type`, `approval_status`
 
-### Product A Tables
+### Product A Schema (`product_a`) - Aliigner
 
-#### brand_profiles
-Marketing brand profiles
-```sql
-- id: uuid (PK)
-- workspace_id: uuid (FK → workspaces)
-- brand_name: text
-```
+**Brand Management**
+- `brand_profiles`, `brand_colors`, `brand_assets`
 
-#### marketing_requests
-Marketing campaign requests
-```sql
-- id: uuid (PK)
-- workspace_id: uuid (FK → workspaces)
-- brand_id: uuid (FK → brand_profiles)
-- title: text
-- status: text (draft | open | awarded | closed | cancelled)
-```
+**Campaign Management**
+- `campaigns`, `campaign_channels`, `campaign_analytics`
 
-### Product B Tables
+**Content Management**
+- `content_calendar`, `content_pieces`
 
-#### campaigns
-Marketing campaigns
-```sql
-- id: uuid (PK)
-- workspace_id: uuid (FK → workspaces)
-- project_id: uuid (FK → projects)
-- campaign_name: text
-- budget: numeric(12,2)
-```
+**Marketing Requests**
+- `marketing_requests`, `request_responses`
 
-## 🔐 Security & Permissions
+### Product B Schema (`product_b`) - CreatiX
 
-### Application Roles
+**Agency Management**
+- `agencies`, `agency_members`, `agency_invitations`, `agency_reviews`
 
-Two application-level roles are created automatically:
+**Client Management**
+- `client_companies`, `client_users`
 
-- **team_a_app**: Full access to `core` and `product_a` schemas
-- **team_b_app**: Full access to `core` and `product_b` schemas
+**Project Management**
+- `proposals`, `proposal_items`, `project_sources`, `project_members`
 
-### Permission Model
+**Campaign & Analytics**
+- `campaigns`, `campaign_metrics`, `competitors`, `competitor_analyses`, `trend_analyses`
 
-```sql
-# Team A Permissions
-- core: SELECT, INSERT, UPDATE
-- product_a: SELECT, INSERT, UPDATE, DELETE
+**AI Features**
+- `ai_suggestions`
 
-# Team B Permissions
-- core: SELECT, INSERT, UPDATE
-- product_b: SELECT, INSERT, UPDATE, DELETE
-```
+## 🔐 Security & Authentication
 
-## 🤖 AI Integration & Approval Workflow
+### JWT Authentication
+- Token-based authentication with refresh tokens
+- Secure password hashing using bcrypt (cost factor: 10)
+- Token expiration: 1h (access), 7d (refresh)
 
-### AI-Generated Content
+### Role-Based Access Control (RBAC)
+- **Admin**: Full workspace control
+- **Manager**: Project management + team oversight
+- **Member**: Task execution + collaboration
+- **Viewer**: Read-only access
 
-Tasks and meeting summaries can be:
-1. **Manually created** (`source_type: 'manual'`) - Auto-approved
-2. **AI-generated** (`source_type: 'ai_generated'`) - Requires approval
+### Database Roles
+- **team_a_app**: Access to `core` + `product_a` schemas
+- **team_b_app**: Access to `core` + `product_b` schemas
+
+### Security Headers (Helmet)
+- XSS Protection
+- Content Security Policy
+- HSTS (HTTP Strict Transport Security)
+- Frame Options (DENY)
+
+## 🤖 AI Integration
+
+### AI-Generated Content Workflow
+1. **Generation**: AI creates tasks/summaries with `source_type: 'ai_generated'`
+2. **Proposal**: Content marked as `approval_status: 'proposed'`
+3. **Review**: Human reviews and approves/rejects
+4. **Approval**: Updates `approved_by` and `approved_at` fields
 
 ### Approval States
 - `proposed` - Awaiting review
-- `approved` - Reviewed and accepted
-- `rejected` - Reviewed and declined
+- `approved` - Accepted by human reviewer
+- `rejected` - Declined by human reviewer
 
-### Approval Requirements
-AI-generated content requires:
-- `approved_by` (user UUID)
-- `approved_at` (timestamp)
+## 🛠️ Backend API
 
-## 🔍 Views & Computed Data
-
-### project_progress
-Real-time project completion percentage
-```sql
-SELECT * FROM core.project_progress;
--- Returns: project_id, progress_pct
-```
-
-## 🛠️ Management Commands
-
-### Database Management
+### Available Scripts
 
 ```bash
-# Stop database
-docker-compose down
+# Development (with hot-reload)
+npm run dev
 
-# Stop and remove volumes (⚠️ destroys all data)
-docker-compose down -v
+# Production
+npm start
 
-# View logs
-docker-compose logs -f db
+# Testing
+npm test                 # Run all tests
+npm run test:watch      # Watch mode
 
-# Backup database
-docker exec saas_postgres pg_dump -U saas_admin saas_platform > backup.sql
-
-# Restore database
-docker exec -i saas_postgres psql -U saas_admin saas_platform < backup.sql
+# Linting (if configured)
+npm run lint
 ```
 
-### Access pgAdmin (if enabled)
+### Environment Variables (Backend)
 
-1. Start with admin profile: `docker-compose --profile admin up -d`
-2. Navigate to: http://localhost:5050
-3. Login with credentials from `.env`
-4. Add server:
-   - Host: `db` (or `host.docker.internal` on Windows/Mac)
-   - Port: `5432`
-   - Username: from `.env` (POSTGRES_USER)
-   - Password: from `.env` (POSTGRES_PASSWORD)
+Create `Core/Back-End/.env`:
 
-## 📝 Environment Variables
+```env
+# Application
+NODE_ENV=development
+PORT=3000
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `POSTGRES_DB` | Database name | `saas_platform` |
-| `POSTGRES_USER` | Admin username | `saas_admin` |
-| `POSTGRES_PASSWORD` | Admin password | *(required)* |
-| `DB_HOST` | Database host | `localhost` |
-| `DB_PORT` | Database port | `5432` |
-| `TEAM_A_PASSWORD` | Product A app role password | *(required)* |
-| `TEAM_B_PASSWORD` | Product B app role password | *(required)* |
+# Database
+DATABASE_URL=postgresql://saas_admin:password@localhost:5432/saas_platform
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=saas_platform
+DB_USER=saas_admin
+DB_PASSWORD=your_secure_password
 
-## 🧪 Testing
+# JWT Authentication
+JWT_SECRET=your_very_secure_secret_key_here
+JWT_EXPIRES_IN=1h
+JWT_REFRESH_SECRET=your_refresh_token_secret
+JWT_REFRESH_EXPIRES_IN=7d
 
-### Connect via psql
+# Security
+BCRYPT_ROUNDS=10
 
+# CORS
+CORS_ORIGIN=http://localhost:5173
+
+# Rate Limiting
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=100
+```
+
+## 🔍 API Endpoints (Planned)
+
+### Authentication
+```
+POST   /api/auth/register          # User registration
+POST   /api/auth/login             # User login
+POST   /api/auth/refresh           # Refresh access token
+POST   /api/auth/logout            # User logout
+```
+
+### Workspaces
+```
+GET    /api/workspaces             # List user workspaces
+POST   /api/workspaces             # Create workspace
+GET    /api/workspaces/:id         # Get workspace details
+PUT    /api/workspaces/:id         # Update workspace
+DELETE /api/workspaces/:id         # Delete workspace
+```
+
+### Users
+```
+GET    /api/users/me               # Current user profile
+PUT    /api/users/me               # Update profile
+GET    /api/users                  # List workspace users (Admin)
+```
+
+### Members
+```
+GET    /api/workspaces/:id/members           # List members
+POST   /api/workspaces/:id/members           # Invite member
+DELETE /api/workspaces/:id/members/:userId   # Remove member
+PUT    /api/workspaces/:id/members/:userId   # Update role
+```
+
+## 🗄️ Database Management
+
+### Access Database
 ```bash
+# Via Docker
 docker exec -it saas_postgres psql -U saas_admin -d saas_platform
+
+# Via local psql
+psql -h localhost -p 5432 -U saas_admin -d saas_platform
 ```
 
-### Sample Queries
-
+### Common Commands
 ```sql
 -- List all schemas
 \dn
 
--- List all tables in core schema
+-- List tables in core schema
 \dt core.*
 
 -- View all workspaces
 SELECT * FROM core.workspaces;
 
--- View all roles
-SELECT * FROM core.roles;
-
--- Get project progress
-SELECT * FROM core.project_progress;
-
--- Check AI-generated tasks pending approval
+-- Check pending AI approvals
 SELECT * FROM core.tasks 
 WHERE source_type = 'ai_generated' 
   AND approval_status = 'proposed';
+
+-- View project progress
+SELECT * FROM core.project_progress;
 ```
 
-## 📚 Additional Documentation
+### Backup & Restore
+```bash
+# Backup
+docker exec saas_postgres pg_dump -U saas_admin saas_platform > backup_$(date +%Y%m%d).sql
 
-- `SQL_FIXES_SUMMARY.md` - Details of SQL fixes applied
-- `SaaS_Review_Feedback_English.docx` - Comprehensive review and feedback
+# Restore
+docker exec -i saas_postgres psql -U saas_admin saas_platform < backup.sql
+```
+
+## 🧪 Testing
+
+### Run Tests
+```bash
+cd Core/Back-End
+npm test                    # Run all tests
+npm run test:watch          # Watch mode with coverage
+```
+
+### Test Structure
+```
+test/
+├── auth.test.js           # JWT authentication tests
+├── tenant.test.js         # Multi-tenancy isolation tests
+└── rbac.test.js           # Role-based access control tests
+```
+
+## 📦 Docker Services
+
+### Available Services
+```bash
+# Start database only
+docker-compose up -d db
+
+# Start with pgAdmin
+docker-compose --profile admin up -d
+
+# Start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+
+# Remove all data (⚠️ destructive)
+docker-compose down -v
+```
+
+### pgAdmin Access
+- URL: http://localhost:5050
+- Email: admin@saas.local
+- Password: (from .env)
+
+## 🐛 Troubleshooting
+
+### Backend won't start
+```bash
+# Check Node.js version
+node --version    # Should be 22.x
+
+# Clear node_modules and reinstall
+cd Core/Back-End
+rm -rf node_modules package-lock.json
+npm install
+
+# Check environment variables
+cat .env
+```
+
+### Database connection fails
+```bash
+# Verify database is running
+docker-compose ps
+
+# Check logs
+docker-compose logs db
+
+# Test connection
+docker exec -it saas_postgres pg_isready -U saas_admin
+```
+
+### Port already in use
+```bash
+# Check what's using port 3000
+netstat -ano | findstr :3000
+
+# Change PORT in .env
+PORT=3001
+```
+
+### npm vulnerabilities
+```bash
+# Update to latest secure versions
+npm update
+
+# Audit and fix
+npm audit fix
+
+# Note: Some vulnerabilities in bcrypt's build dependencies are safe to ignore
+```
+
+## 📚 Additional Resources
+
+- [Express.js Documentation](https://expressjs.com/)
+- [PostgreSQL Documentation](https://www.postgresql.org/docs/)
+- [JWT.io](https://jwt.io/)
+- [Node.js Best Practices](https://github.com/goldbergyoni/nodebestpractices)
 
 ## 🤝 Contributing
 
-When adding new features:
-1. Update the appropriate SQL file in `/db`
-2. Follow UUID primary key pattern
-3. Include workspace_id for multi-tenancy
-4. Add proper foreign key constraints with ON DELETE CASCADE
-5. Update this README with schema changes
+### Adding New Features
+1. Update SQL schema in `/db`
+2. Create migration script if needed
+3. Update backend services/controllers
+4. Add tests
+5. Update this README
+
+### Code Style
+- Use ES6+ features
+- Follow async/await pattern
+- Maintain Routes → Controllers → Services architecture
+- Add JSDoc comments for functions
 
 ## 📄 License
 
 [Add your license here]
 
-## 🐛 Troubleshooting
-
-### Database won't start
-```bash
-# Check logs
-docker-compose logs db
-
-# Remove and recreate
-docker-compose down -v
-docker-compose up -d
-```
-
-### Permission denied errors
-- Ensure SQL files have read permissions
-- Check Docker volume permissions
-
-### Connection refused
-- Wait for health check to pass (~30 seconds)
-- Verify port 5432 isn't already in use
-- Check firewall settings
-
 ---
 
-**God help us all**
+**Database Schema Version**: 1.0.0  
+**Backend API Version**: 1.0.0  
+**Last Updated**: 2026-11-19
+
+**God help us all** 🙏
